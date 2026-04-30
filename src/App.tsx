@@ -16,6 +16,7 @@ const balloons = [
 const App = () => {
   const [showSplash, setShowSplash] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [hasTriedAutoplay, setHasTriedAutoplay] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioSrc = `${import.meta.env.BASE_URL}birthday-song.mp3`
 
@@ -25,46 +26,31 @@ const App = () => {
   }, [])
 
   const playAudio = async () => {
-    if (!audioRef.current || isPlaying) return
+    if (!audioRef.current) return
     try {
       audioRef.current.volume = 0.8
       await audioRef.current.play()
       setIsPlaying(true)
-    } catch {
+    } catch (err) {
+      console.log('Audio play failed:', err)
       setIsPlaying(false)
     }
   }
 
   useEffect(() => {
-    if (!showSplash) {
+    if (!showSplash && !hasTriedAutoplay) {
       playAudio()
+      setHasTriedAutoplay(true)
     }
-  }, [showSplash])
-
-  useEffect(() => {
-    const handleInteraction = () => {
-      if (!showSplash && !isPlaying) {
-        playAudio()
-      }
-    }
-
-    document.addEventListener('click', handleInteraction)
-    document.addEventListener('touchstart', handleInteraction)
-
-    return () => {
-      document.removeEventListener('click', handleInteraction)
-      document.removeEventListener('touchstart', handleInteraction)
-    }
-  }, [showSplash, isPlaying])
+  }, [showSplash, hasTriedAutoplay])
 
   const handleManualPlay = async () => {
-    if (!audioRef.current) {
-      return
-    }
+    if (!audioRef.current) return
     try {
       await audioRef.current.play()
       setIsPlaying(true)
-    } catch {
+    } catch (err) {
+      console.log('Manual play failed:', err)
       setIsPlaying(false)
     }
   }
