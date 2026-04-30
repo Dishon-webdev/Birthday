@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap");
 
 :root {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif;
   background-color: #fff7fb;
   color: #2f0d1a;
 }
@@ -62,7 +62,7 @@ body {
 
 .butterfly::before,
 .butterfly::after {
-  content: '';
+  content: "";
   position: absolute;
   width: 28px;
   height: 28px;
@@ -99,7 +99,7 @@ body {
 }
 
 .butterfly::before {
-  content: '🦋';
+  content: "🦋";
   inset: 4px;
   font-size: 1rem;
   display: flex;
@@ -183,7 +183,11 @@ body {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.2));
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 255, 255, 0.2)
+  );
   animation: bubbleRise 6s ease-in-out infinite;
 }
 
@@ -222,7 +226,7 @@ body {
 }
 
 .balloon-row .balloon::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 50%;
   bottom: -18px;
@@ -256,7 +260,7 @@ body {
   top: -1.8rem;
   left: 50%;
   transform: translateX(-50%);
-  font-family: 'Great Vibes', 'Brush Script MT', 'Segoe Script', cursive;
+  font-family: "Great Vibes", "Brush Script MT", "Segoe Script", cursive;
   font-size: 1rem;
   letter-spacing: 0.15em;
   color: #b12f5c;
@@ -279,7 +283,7 @@ body {
 }
 
 .foliage::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 20% 15%;
   background: rgba(255, 255, 255, 0.3);
@@ -344,7 +348,6 @@ body {
   }
 }
 
-
 .rose-shell.hidden {
   opacity: 0;
   pointer-events: none;
@@ -354,8 +357,16 @@ body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.8), transparent 45%),
-    radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.6), transparent 40%),
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(255, 255, 255, 0.8),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 80% 10%,
+      rgba(255, 255, 255, 0.6),
+      transparent 40%
+    ),
     linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 211, 223, 0.6));
   mix-blend-mode: screen;
   pointer-events: none;
@@ -385,13 +396,51 @@ body {
 .splash-screen {
   position: fixed;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 119, 178, 0.95), rgba(255, 182, 193, 0.75));
+  background: linear-gradient(
+    135deg,
+    rgba(255, 119, 178, 0.95),
+    rgba(255, 182, 193, 0.75)
+  );
   z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   color: #fff;
+}
+
+.tap-to-start {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+.tap-content {
+  padding: 2rem 3rem;
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.tap-content h2 {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+  color: #b52f69;
+}
+
+.tap-content p {
+  margin: 0;
+  color: rgba(47, 13, 26, 0.8);
+  font-size: 1rem;
+  letter-spacing: 0.1em;
 }
 
 .splash-content {
@@ -494,7 +543,7 @@ body {
 }
 
 .popper::after {
-  content: '\1F389';
+  content: "\1F389";
   position: absolute;
   top: -28px;
   right: -12px;
@@ -525,11 +574,15 @@ body {
 }
 
 .firecracker::after {
-  content: '';
+  content: "";
   position: absolute;
   width: 16px;
   height: 16px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(255, 107, 125, 0));
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.9),
+    rgba(255, 107, 125, 0)
+  );
   top: -8px;
   left: -3px;
   filter: blur(1px);
@@ -561,7 +614,7 @@ body {
 }
 
 .chocolate::before {
-  content: '';
+  content: "";
   position: absolute;
   width: 24px;
   height: 14px;
@@ -572,7 +625,7 @@ body {
 }
 
 .chocolate::after {
-  content: '\1F36B';
+  content: "\1F36B";
   position: absolute;
   top: -34px;
   left: 12px;
@@ -984,5 +1037,15 @@ body {
   }
   50% {
     transform: translateY(-6px);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
   }
 }
