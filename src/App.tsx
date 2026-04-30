@@ -16,7 +16,6 @@ const balloons = [
 const App = () => {
   const [showSplash, setShowSplash] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [hasInteracted, setHasInteracted] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioSrc = `${import.meta.env.BASE_URL}birthday-song.mp3`
 
@@ -37,19 +36,17 @@ const App = () => {
     }
   }
 
-  const handleFirstInteraction = () => {
-    if (!hasInteracted && !isPlaying) {
+  useEffect(() => {
+    if (!showSplash) {
       playAudio()
-      setHasInteracted(true)
     }
-  }
+  }, [showSplash])
 
   const handleManualPlay = async () => {
     if (!audioRef.current) return
     try {
       await audioRef.current.play()
       setIsPlaying(true)
-      setHasInteracted(true)
     } catch (err) {
       console.log('Manual play failed:', err)
       setIsPlaying(false)
@@ -63,20 +60,6 @@ const App = () => {
     }
     setIsPlaying(false)
   }
-
-  useEffect(() => {
-    if (!showSplash && !hasInteracted) {
-      const handleInteraction = () => {
-        handleFirstInteraction()
-      }
-      document.addEventListener('click', handleInteraction, { once: true })
-      document.addEventListener('touchstart', handleInteraction, { once: true })
-      return () => {
-        document.removeEventListener('click', handleInteraction)
-        document.removeEventListener('touchstart', handleInteraction)
-      }
-    }
-  }, [showSplash, hasInteracted])
 
   return (
     <div className="page-shell">
