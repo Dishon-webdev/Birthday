@@ -16,7 +16,6 @@ const balloons = [
 const App = () => {
   const [showSplash, setShowSplash] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [hasInteracted, setHasInteracted] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioSrc = `${import.meta.env.BASE_URL}birthday-song.mp3`
 
@@ -25,23 +24,38 @@ const App = () => {
     return () => window.clearTimeout(timer)
   }, [])
 
-  const attemptPlay = async () => {
-    if (!audioRef.current || hasInteracted) return
+  const playAudio = async () => {
+    if (!audioRef.current || isPlaying) return
     try {
       audioRef.current.volume = 0.8
       await audioRef.current.play()
       setIsPlaying(true)
-      setHasInteracted(true)
     } catch {
-      setHasInteracted(false)
+      setIsPlaying(false)
     }
   }
 
   useEffect(() => {
-    if (!showSplash && audioRef.current) {
-      attemptPlay()
+    if (!showSplash) {
+      playAudio()
     }
   }, [showSplash])
+
+  useEffect(() => {
+    const handleInteraction = () => {
+      if (!showSplash && !isPlaying) {
+        playAudio()
+      }
+    }
+
+    document.addEventListener('click', handleInteraction)
+    document.addEventListener('touchstart', handleInteraction)
+
+    return () => {
+      document.removeEventListener('click', handleInteraction)
+      document.removeEventListener('touchstart', handleInteraction)
+    }
+  }, [showSplash, isPlaying])
 
   const handleManualPlay = async () => {
     if (!audioRef.current) {
@@ -50,7 +64,6 @@ const App = () => {
     try {
       await audioRef.current.play()
       setIsPlaying(true)
-      setHasInteracted(true)
     } catch {
       setIsPlaying(false)
     }
@@ -65,7 +78,7 @@ const App = () => {
   }
 
   return (
-    <div className="page-shell" onClick={!hasInteracted ? attemptPlay : undefined}>
+    <div className="page-shell">
       {showSplash && (
         <div className="splash-screen" role="status" aria-live="polite">
           <div className="splash-content">
