@@ -16,6 +16,7 @@ const balloons = [
 const App = () => {
   const [showSplash, setShowSplash] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [hasInteracted, setHasInteracted] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioSrc = `${import.meta.env.BASE_URL}birthday-song.mp3`
 
@@ -24,13 +25,21 @@ const App = () => {
     return () => window.clearTimeout(timer)
   }, [])
 
+  const attemptPlay = async () => {
+    if (!audioRef.current || hasInteracted) return
+    try {
+      audioRef.current.volume = 0.8
+      await audioRef.current.play()
+      setIsPlaying(true)
+      setHasInteracted(true)
+    } catch {
+      setHasInteracted(false)
+    }
+  }
+
   useEffect(() => {
     if (!showSplash && audioRef.current) {
-      audioRef.current.volume = 0.8
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => setIsPlaying(false))
+      attemptPlay()
     }
   }, [showSplash])
 
@@ -41,6 +50,7 @@ const App = () => {
     try {
       await audioRef.current.play()
       setIsPlaying(true)
+      setHasInteracted(true)
     } catch {
       setIsPlaying(false)
     }
@@ -55,7 +65,7 @@ const App = () => {
   }
 
   return (
-    <div className="page-shell">
+    <div className="page-shell" onClick={!hasInteracted ? attemptPlay : undefined}>
       {showSplash && (
         <div className="splash-screen" role="status" aria-live="polite">
           <div className="splash-content">
@@ -130,7 +140,7 @@ const App = () => {
           <h1>Happy Birthday Nishanthini</h1>
         </main>
 
-        <audio ref={audioRef} src={audioSrc} loop autoPlay playsInline />
+        <audio ref={audioRef} src={audioSrc} loop playsInline />
 
         <div className="sound-control">
           <p className="volume-note">
