@@ -133,8 +133,8 @@ const App = () => {
           </p>
         </div>
         <main className="wish-block">
-          <p className="subtitle">November 24</p>
-          <h1>Happy Birthday Nishanthini</h1>
+          <p className="subtitle">May 30</p>
+          <h1>Happy Birthday Sankavi</h1>
         </main>
 
         <audio ref={audioRef} src={audioSrc} loop playsInline />
