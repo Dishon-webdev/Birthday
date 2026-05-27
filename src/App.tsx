@@ -1,168 +1,177 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
-const butterflies = [
-  { id: 'butterfly-1', delay: '0s', offset: 2, variant: 'pink' },
-  { id: 'butterfly-2', delay: '1.2s', offset: -1.5, variant: 'white' },
-  { id: 'butterfly-3', delay: '2.4s', offset: 1, variant: 'yellow' },
+const TAGS = ['Cake', 'Joy', 'Music', 'Memories']
+const BALLOONS = [
+  { id: 'left', x: '10%', delay: '0s', scale: 1 },
+  { id: 'center', x: '44%', delay: '1.1s', scale: 1.1 },
+  { id: 'right', x: '78%', delay: '0.4s', scale: 0.95 },
 ]
-const flowers = Array.from({ length: 14 }, (_, idx) => ({ id: `flower-${idx}`, delay: `${idx * 0.2}s` }))
-const bubbles = Array.from({ length: 6 }, (_, idx) => ({ id: `bubble-${idx}`, delay: `${idx * 0.8}s` }))
-const balloons = [
-  { id: 'balloon-1', left: '10%', delay: '0s' },
-  { id: 'balloon-2', left: '65%', delay: '1.6s' },
-  { id: 'balloon-3', left: '80%', delay: '0.8s' },
-]
+
+const CONFETTI = Array.from({ length: 18 }, (_, index) => ({
+  id: `confetti-${index}`,
+  left: `${8 + ((index * 7) % 84)}%`,
+  delay: `${(index % 6) * 0.08}s`,
+  duration: `${1.1 + (index % 5) * 0.12}s`,
+  rotate: `${(index % 2 === 0 ? 1 : -1) * (12 + (index % 6) * 5)}deg`,
+}))
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(true)
+  const [revealMain, setRevealMain] = useState(false)
+  const [confettiBurst, setConfettiBurst] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const hasAutoPlayed = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioSrc = `${import.meta.env.BASE_URL}birthday-song.mp3`
 
+  const mainClassName = useMemo(
+    () => `main-screen ${revealMain ? 'main-screen--visible' : ''}`,
+    [revealMain],
+  )
+
+  const triggerReveal = () => {
+    if (!showSplash) return
+    setShowSplash(false)
+    setRevealMain(true)
+    setConfettiBurst(true)
+    window.setTimeout(() => setConfettiBurst(false), 1600)
+  }
+
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowSplash(false), 3200)
+    const timer = window.setTimeout(triggerReveal, 3000)
     return () => window.clearTimeout(timer)
   }, [])
 
-  const playAudio = async () => {
-    if (!audioRef.current || isPlaying) return
+  useEffect(() => {
+    if (!showSplash && audioRef.current && !hasAutoPlayed.current) {
+      hasAutoPlayed.current = true
+      audioRef.current.volume = 0.8
+      audioRef.current.play()
+        .then(() => {
+          setIsPlaying(true)
+        })
+        .catch(() => {
+        })
+    }
+  }, [showSplash, isPlaying])
+
+  const toggleAudio = async () => {
+    if (!audioRef.current) return
+
+    if (isPlaying) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+      return
+    }
+
     try {
       audioRef.current.volume = 0.8
       await audioRef.current.play()
       setIsPlaying(true)
-    } catch (err) {
-      console.log('Audio play failed:', err)
-      setIsPlaying(false)
+    } catch (error) {
+      console.error('Birthday song playback failed:', error)
     }
-  }
-
-  useEffect(() => {
-    if (!showSplash) {
-      playAudio()
-    }
-  }, [showSplash])
-
-  const handleManualPlay = async () => {
-    if (!audioRef.current) return
-    try {
-      await audioRef.current.play()
-      setIsPlaying(true)
-    } catch (err) {
-      console.log('Manual play failed:', err)
-      setIsPlaying(false)
-    }
-  }
-
-  const stopSong = () => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-    }
-    setIsPlaying(false)
   }
 
   return (
     <div className="page-shell">
       {showSplash && (
-        <div className="splash-screen" role="status" aria-live="polite">
-          <div className="splash-content">
-            <h2>Surprise!</h2>
-            <p>Birthday magic incoming</p>
-            <div className="gift-box" aria-hidden="true">
-              <span className="box-lid" />
-              <span className="box-base" />
+        <button type="button" className="splash-screen" onClick={triggerReveal} aria-label="Reveal birthday greeting">
+          <div className="splash-card">
+            <p className="splash-kicker">Surprise!</p>
+            <h2>Birthday magic incoming</h2>
+            <div className="gift-stage" aria-hidden="true">
+              <div className="gift-box">
+                <span className="gift-ribbon gift-ribbon--vertical" />
+                <span className="gift-ribbon gift-ribbon--horizontal" />
+                <span className="gift-bow" />
+                <span className="gift-spark gift-spark--one" />
+                <span className="gift-spark gift-spark--two" />
+                <span className="gift-spark gift-spark--three" />
+              </div>
             </div>
-            <div className="paper-blast" aria-hidden="true" />
-            <div className="bubble bubble-a" />
-            <div className="bubble bubble-b" />
-            <div className="bubble bubble-c" />
-            <div className="popper popper-a" />
-            <div className="popper popper-b" />
-            <div className="firecracker firecracker-a" />
-            <div className="firecracker firecracker-b" />
-            <div className="chocolate" />
-            <div className="cake-flare" />
+            <p className="splash-hint">Click to reveal or wait a moment</p>
           </div>
-        </div>
+        </button>
       )}
 
-      <div className={`rose-shell ${showSplash ? 'hidden' : ''}`}>
-        <div className="rose-gradient" aria-hidden="true" />
-        <div className="butterfly-row" aria-hidden="true">
-          {butterflies.map((butterfly) => (
+      <main className={mainClassName} aria-hidden={showSplash}>
+        <div className="main-background" aria-hidden="true" />
+        <div className="main-glow" aria-hidden="true" />
+
+        <div className={`confetti-layer ${confettiBurst ? 'confetti-layer--active' : ''}`} aria-hidden="true">
+          {CONFETTI.map((piece) => (
             <span
-              key={butterfly.id}
-              className={`butterfly butterfly--${butterfly.variant}`}
-              style={{ animationDelay: butterfly.delay, ['--offset' as string]: butterfly.offset } as CSSProperties}
+              key={piece.id}
+              className="confetti-piece"
+              style={
+                {
+                  left: piece.left,
+                  animationDelay: piece.delay,
+                  animationDuration: piece.duration,
+                  ['--confetti-rotation' as string]: piece.rotate,
+                } as CSSProperties
+              }
             />
           ))}
         </div>
-        <div className="flower-rain" aria-hidden="true">
-          {flowers.map((flower) => (
-            <span key={flower.id} className="flower" style={{ animationDelay: flower.delay }} />
+
+        <div className="balloon-layer" aria-hidden="true">
+          {BALLOONS.map((balloon) => (
+            <span
+              key={balloon.id}
+              className="balloon"
+              style={
+                {
+                  left: balloon.x,
+                  animationDelay: balloon.delay,
+                  ['--balloon-scale' as string]: balloon.scale,
+                } as CSSProperties
+              }
+            >
+              <span className="balloon-string" />
+            <span className="balloon-knot" />
+            </span>
           ))}
         </div>
-        <div className="bubble-row" aria-hidden="true">
-          {bubbles.map((bubble) => (
-            <span key={bubble.id} className="floating-bubble" style={{ animationDelay: bubble.delay }} />
-          ))}
-        </div>
-        <div className="balloon-row" aria-hidden="true">
-          {balloons.map((balloon) => (
-            <span key={balloon.id} className="balloon" style={{ left: balloon.left, animationDelay: balloon.delay }} />
-          ))}
-        </div>
-        <div className="tree-row" aria-hidden="true">
-          <div className="tree tree-left">
-            <div className="foliage">
-              <span className="fruit fruit--pink" />
-              <span className="fruit fruit--yellow" />
-            </div>
-            <div className="trunk" />
-          </div>
-          <div className="tree tree-right">
-            <div className="foliage">
-              <span className="fruit fruit--pink" />
-              <span className="fruit fruit--yellow" />
-              <span className="fruit fruit--pink" />
-            </div>
-            <div className="trunk" />
-          </div>
-          <p className="tree-signature" aria-hidden="true">
-            Wishes by Dishon
-          </p>
-        </div>
-        <main className="wish-block">
-          <p className="subtitle">May 30</p>
+
+        <div className="content-shell">
+          <p className="date-pill">May 30</p>
           <h1>Happy Birthday Sankavi</h1>
-        </main>
+          <p className="wish-copy">
+            Wishing you a day wrapped in cake, laughter, music, and the kind of moments that stay bright all
+            year.
+          </p>
+
+          <div className="tag-row" aria-label="Birthday wishes">
+            {TAGS.map((tag) => (
+              <span key={tag} className="wish-tag">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
 
         <audio ref={audioRef} src={audioSrc} loop playsInline />
 
-        <div className="sound-control">
-          <p className="volume-note">
-            <span className="wave">Volume up</span>
-          </p>
-          {isPlaying ? (
-            <button
-              type="button"
-              className="btn-stop responsive-stop"
-              onClick={stopSong}
-              disabled={!isPlaying}
-            >
-              Stop
-            </button>
-          ) : (
-            <button type="button" className="btn-play responsive-stop" onClick={handleManualPlay}>
-              Play
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          className={`music-pill ${isPlaying ? 'music-pill--playing' : ''}`}
+          onClick={toggleAudio}
+          aria-label={isPlaying ? 'Pause birthday song' : 'Play birthday song'}
+        >
+          <span className="music-pill__icon" aria-hidden="true">
+            ♪
+          </span>
+          <span className="music-pill__label">{isPlaying ? 'Pause' : 'Play'}</span>
+        </button>
 
-      </div>
+        <p className="signature" aria-hidden="true">
+          Wishes by Dishon
+        </p>
+      </main>
     </div>
   )
 }
 
 export default App
-
