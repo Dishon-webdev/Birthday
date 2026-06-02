@@ -452,12 +452,17 @@ const App = () => {
           <div className="message-card">
             <div className="msg-accent" aria-hidden="true" />
             <h2 className="msg-title">A MESSAGE FOR YOU</h2>
-            <p className="msg-body">
-              Nineteen years ago the world got a little more interesting. You've been lighting up every room, every moment, every memory since day one.
-            </p>
-            <p className="msg-body">
-              Today is yours, Sharon. Every single second of it. Here's to <em>nineteen</em> — and to every incredible year still to come.
-            </p>
+<p className="msg-body">
+  Nineteen years ago the world got a little more interesting —
+  specifically, the trash can outside. We found you, cleaned you up,
+  and decided to keep you. Best decision ever, honestly.
+</p>
+<p className="msg-body">
+  But in all seriousness — you've been lighting up every room, every
+  moment, every memory since day one. Today is yours, Sharon. Every
+  single second of it. Here's to <em>nineteen</em> — and to every
+  incredible year still to come. 🗑️→👑
+</p>
             <div className="msg-signature">
               <span className="sig-line" aria-hidden="true" />
               <span className="sig-text">From your Besto Friendo, Dishon ✦</span>
