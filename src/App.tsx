@@ -1,491 +1,660 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
 } from 'react'
 
-const rand = (min: number, max: number) => Math.random() * (max - min) + min
-const randInt = (min: number, max: number) => Math.floor(rand(min, max))
+/* ─── Utilities ─────────────────────────────────────────── */
+const rand = (a: number, b: number) => Math.random() * (b - a) + a
 
-interface StarParticle {
-  x: number; y: number; z: number; px: number; py: number
-}
-
-function useStarCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>, active: boolean) {
-  const starsRef = useRef<StarParticle[]>([])
-  const rafRef = useRef<number>(0)
-  const mouseRef = useRef({ x: 0, y: 0 })
-
-  useEffect(() => {
-    if (!active) return
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')!
-    let W = 0, H = 0
-
-    const resize = () => {
-      W = canvas.width = window.innerWidth
-      H = canvas.height = window.innerHeight
-      starsRef.current = Array.from({ length: 280 }, () => ({
-        x: rand(-W / 2, W / 2), y: rand(-H / 2, H / 2),
-        z: rand(0.1, 1), px: 0, py: 0,
-      }))
-    }
-    resize()
-    window.addEventListener('resize', resize)
-
-    const onMouse = (e: MouseEvent) => {
-      mouseRef.current = { x: e.clientX - W / 2, y: e.clientY - H / 2 }
-    }
-    window.addEventListener('mousemove', onMouse)
-
-    let speed = 0.0005
-    const maxSpeed = 0.0016
-    let frame = 0
-
-    const draw = () => {
-      frame++
-      if (speed < maxSpeed) speed += 0.000003
-      ctx.fillStyle = 'rgba(3,4,10,0.16)'
-      ctx.fillRect(0, 0, W, H)
-
-      const cx = W / 2 + mouseRef.current.x * 0.035
-      const cy = H / 2 + mouseRef.current.y * 0.035
-      ctx.save()
-      ctx.translate(cx, cy)
-
-      for (const s of starsRef.current) {
-        s.z -= speed
-        if (s.z <= 0) {
-          s.x = rand(-W / 2, W / 2); s.y = rand(-H / 2, H / 2)
-          s.z = 1; s.px = s.x; s.py = s.y
-        }
-        const scale = 1 / s.z
-        const sx = s.x * scale, sy = s.y * scale
-        const r = Math.min((1 - s.z) * 2.6, 2.4)
-        const alpha = Math.min((1 - s.z) * 1.5, 1)
-        const key = (Math.abs(s.x * s.y) | 0)
-        const isGold = key % 9 === 0
-        const isCyan = key % 13 === 0
-
-        ctx.beginPath()
-        ctx.arc(sx, sy, r, 0, Math.PI * 2)
-        ctx.fillStyle = isGold
-          ? `rgba(240,192,80,${alpha})`
-          : isCyan ? `rgba(80,220,255,${alpha})`
-          : `rgba(220,225,255,${alpha})`
-        ctx.fill()
-
-        if (s.z < 0.55) {
-          const ps = 1 / (s.z + speed * 22)
-          ctx.beginPath()
-          ctx.moveTo(s.px * ps, s.py * ps)
-          ctx.lineTo(sx, sy)
-          ctx.strokeStyle = isGold
-            ? `rgba(240,192,80,${alpha * 0.5})`
-            : isCyan ? `rgba(80,220,255,${alpha * 0.4})`
-            : `rgba(200,210,255,${alpha * 0.3})`
-          ctx.lineWidth = r * 0.65
-          ctx.stroke()
-        }
-        s.px = s.x; s.py = s.y
-      }
-
-      if (frame % 200 === 0) {
-        const mx = rand(-W / 2, W / 2)
-        const my = rand(-H / 2, 0)
-        const len = rand(100, 200)
-        const g = ctx.createLinearGradient(mx, my, mx + len, my + len * 0.3)
-        g.addColorStop(0, 'rgba(255,255,255,0)')
-        g.addColorStop(0.45, 'rgba(255,240,180,0.85)')
-        g.addColorStop(1, 'rgba(255,255,255,0)')
-        ctx.strokeStyle = g; ctx.lineWidth = 1.4
-        ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + len, my + len * 0.3); ctx.stroke()
-      }
-
-      ctx.restore()
-      rafRef.current = requestAnimationFrame(draw)
-    }
-    rafRef.current = requestAnimationFrame(draw)
-
-    return () => {
-      cancelAnimationFrame(rafRef.current)
-      window.removeEventListener('resize', resize)
-      window.removeEventListener('mousemove', onMouse)
-    }
-  }, [active, canvasRef])
-}
-
-const GLITCH_CHARS = '!<>-_\\/[]{}—=+*^?#◆◈✦'
-function useGlitchText(target: string, active: boolean) {
-  const [text, setText] = useState(target)
-  useEffect(() => {
-    if (!active) return
-    let iter = 0
-    const interval = setInterval(() => {
-      setText(target.split('').map((ch, i) =>
-        i < iter ? ch : ch === ' ' ? ' ' : GLITCH_CHARS[randInt(0, GLITCH_CHARS.length)]
-      ).join(''))
-      iter += 0.45
-      if (iter >= target.length) clearInterval(interval)
-    }, 28)
-    return () => clearInterval(interval)
-  }, [target, active])
-  return text
-}
-
-interface ConfettiP {
+/* ─── Petal / Rose-petal confetti on blessings ─────────── */
+interface Petal {
   id: number; x: number; y: number; vx: number; vy: number
-  color: string; rot: number; rotV: number; size: number; life: number; shape: 'rect' | 'circle'
+  rot: number; rotV: number; size: number; life: number; color: string
 }
-const CONFETTI_COLORS = ['#f0c060','#50dcff','#ff6090','#a0ff80','#ffffff','#ffaa40','#c87fff']
+const PETAL_COLORS = ['#D4A017','#C0392B','#8B0000','#F4C430','#E8735A','#FFF8E7','#FFD700']
 
-function useCakeConfetti() {
-  const [particles, setParticles] = useState<ConfettiP[]>([])
-  const rafRef = useRef<number>(0)
+function usePetals() {
+  const [petals, setPetals] = useState<Petal[]>([])
+  const raf = useRef<number>(0)
 
   const burst = useCallback((ox: number, oy: number) => {
-    const ps: ConfettiP[] = Array.from({ length: 70 }, (_, id) => ({
+    const ps: Petal[] = Array.from({ length: 55 }, (_, id) => ({
       id, x: ox, y: oy,
-      vx: rand(-11, 11), vy: rand(-18, -5),
-      color: CONFETTI_COLORS[randInt(0, CONFETTI_COLORS.length)],
-      rot: rand(0, 360), rotV: rand(-7, 7),
-      size: rand(5, 12), life: 1,
-      shape: Math.random() > 0.5 ? 'rect' : 'circle',
+      vx: rand(-9, 9), vy: rand(-16, -4),
+      rot: rand(0, 360), rotV: rand(-5, 5),
+      size: rand(6, 14), life: 1,
+      color: PETAL_COLORS[Math.floor(rand(0, PETAL_COLORS.length))],
     }))
-    setParticles(ps)
+    setPetals(ps)
     const animate = () => {
-      setParticles(prev => {
+      setPetals(prev => {
         const next = prev.map(p => ({
-          ...p, x: p.x + p.vx, y: p.y + p.vy,
-          vy: p.vy + 0.52, vx: p.vx * 0.975,
-          rot: p.rot + p.rotV, life: p.life - 0.016,
+          ...p,
+          x: p.x + p.vx, y: p.y + p.vy,
+          vy: p.vy + 0.45, vx: p.vx * 0.98,
+          rot: p.rot + p.rotV, life: p.life - 0.018,
         })).filter(p => p.life > 0)
         if (next.length === 0) return next
-        rafRef.current = requestAnimationFrame(animate)
+        raf.current = requestAnimationFrame(animate)
         return next
       })
     }
-    cancelAnimationFrame(rafRef.current)
-    rafRef.current = requestAnimationFrame(animate)
+    cancelAnimationFrame(raf.current)
+    raf.current = requestAnimationFrame(animate)
   }, [])
 
-  return { particles, burst }
+  return { petals, burst }
 }
 
-function useScrollReveal(dep: boolean) {
+/* ─── Kolam drawing hook ────────────────────────────────── */
+function useKolamDraw(active: boolean) {
+  const [progress, setProgress] = useState(0)
   useEffect(() => {
-    if (!dep) return
+    if (!active) return
+    let p = 0
+    const id = setInterval(() => {
+      p += 1.4
+      setProgress(Math.min(p, 100))
+      if (p >= 100) clearInterval(id)
+    }, 28)
+    return () => clearInterval(id)
+  }, [active])
+  return progress
+}
+
+/* ─── Scroll reveal ─────────────────────────────────────── */
+function useScrollReveal() {
+  useEffect(() => {
     const els = document.querySelectorAll<HTMLElement>('.reveal')
     const io = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('reveal--in'); io.unobserve(e.target) } })
-    }, { threshold: 0.12 })
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('reveal--in'); io.unobserve(e.target) }
+      })
+    }, { threshold: 0.1 })
     els.forEach(el => io.observe(el))
     return () => io.disconnect()
-  }, [dep])
+  }, [])
 }
 
-const BOOT_LINES = [
-  '> GALAXY SYSTEM BOOT — v19.0.0',
-  '> SCANNING IDENTITY: SHARON',
-  '> DATE LOCKED: 03 · 06 · 2006',
-  '> MISSION CLASS: BIRTHDAY LEGEND',
-  '> AGE MILESTONE DETECTED: 19 YEARS',
-  '> CELEBRATION PROTOCOL INITIALIZING…',
+/* ─── Typewriter for splash ─────────────────────────────── */
+function useTypewriter(text: string, active: boolean, onDone: () => void) {
+  const [out, setOut] = useState('')
+  const done = useRef(false)
+  useEffect(() => {
+    if (!active || done.current) return
+    if (out.length >= text.length) {
+      done.current = true
+      const t = setTimeout(onDone, 1200)
+      return () => clearTimeout(t)
+    }
+    const t = setTimeout(() => setOut(text.slice(0, out.length + 1)), 48)
+    return () => clearTimeout(t)
+  }, [active, out, text, onDone])
+  return out
+}
+
+/* ─── Blessings ─────────────────────────────────────────── */
+interface Blessing {
+  id: number; name: string; msg: string; time: string
+}
+const SAMPLE_BLESSINGS: Blessing[] = [
+  { id: 1, name: 'Aachi (Paati)', msg: 'May Lord Murugan bless this little one with health, wisdom and prosperity. வாழ்த்துக்கள்! 🙏', time: 'Just now' },
+  { id: 2, name: 'Thaatha', msg: 'Our hearts are overflowing with joy. May you grow strong and noble like your father. ஆயுஷ்மான் பவ!', time: '2 min ago' },
+  { id: 3, name: 'Periamma', msg: 'Welcome to this beautiful world, little one. You are surrounded by so much love already! 🌸', time: '5 min ago' },
 ]
 
-function useTypewriter(lines: string[], active: boolean, onDone: () => void) {
-  const [displayed, setDisplayed] = useState<string[]>([])
-  const [lineIdx, setLineIdx] = useState(0)
-  const [charIdx, setCharIdx] = useState(0)
-  const doneRef = useRef(false)
+/* ─── Kolam SVG component ───────────────────────────────── */
+function KolamPattern({ progress }: { progress: number }) {
+  const dash = (total: number) => {
+    const drawn = (progress / 100) * total
+    return `${drawn} ${total}`
+  }
+  return (
+    <svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg"
+      className="kolam-svg" aria-label="Traditional kolam pattern" role="img">
+      <defs>
+        <radialGradient id="kolamGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#D4A017" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="#8B0000" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle cx="160" cy="160" r="155" fill="url(#kolamGlow)" />
 
-  useEffect(() => {
-    if (!active || doneRef.current) return
-    if (lineIdx >= lines.length) {
-      doneRef.current = true
-      const t = window.setTimeout(onDone, 700)
-      return () => window.clearTimeout(t)
-    }
-    const line = lines[lineIdx]
-    if (charIdx <= line.length) {
-      const t = window.setTimeout(() => {
-        setDisplayed(prev => { const n = [...prev]; n[lineIdx] = line.slice(0, charIdx); return n })
-        setCharIdx(c => c + 1)
-      }, charIdx === 0 ? 320 : 24)
-      return () => window.clearTimeout(t)
-    } else {
-      const t = window.setTimeout(() => { setLineIdx(l => l + 1); setCharIdx(0) }, 180)
-      return () => window.clearTimeout(t)
-    }
-  }, [active, lineIdx, charIdx, lines, onDone])
+      {/* Outer lotus ring */}
+      {Array.from({ length: 12 }, (_, i) => {
+        const angle = (i / 12) * Math.PI * 2
+        const cx = 160 + Math.cos(angle) * 130
+        const cy = 160 + Math.sin(angle) * 130
+        const r2x = 160 + Math.cos(angle) * 108
+        const r2y = 160 + Math.sin(angle) * 108
+        return (
+          <ellipse key={i}
+            cx={(cx + r2x) / 2} cy={(cy + r2y) / 2}
+            rx="16" ry="9"
+            transform={`rotate(${(i / 12) * 360 + 90}, ${(cx + r2x) / 2}, ${(cy + r2y) / 2})`}
+            fill="none" stroke="#D4A017" strokeWidth="1.4"
+            strokeDasharray={dash(60)} strokeDashoffset="0"
+            opacity="0.85"
+          />
+        )
+      })}
 
-  return displayed
+      {/* Outer octagram */}
+      {[0, 45, 90, 135].map(deg => (
+        <rect key={deg}
+          x="60" y="60" width="200" height="200"
+          fill="none" stroke="#C0392B" strokeWidth="1.2"
+          transform={`rotate(${deg} 160 160)`}
+          strokeDasharray={dash(800)} opacity="0.7"
+        />
+      ))}
+
+      {/* Mid lotus petals */}
+      {Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * Math.PI * 2
+        const cx = 160 + Math.cos(a) * 80
+        const cy = 160 + Math.sin(a) * 80
+        return (
+          <ellipse key={i}
+            cx={cx} cy={cy} rx="22" ry="11"
+            transform={`rotate(${(i / 8) * 360 + 90}, ${cx}, ${cy})`}
+            fill="none" stroke="#D4A017" strokeWidth="1.6"
+            strokeDasharray={dash(100)} opacity="0.9"
+          />
+        )
+      })}
+
+      {/* Inner hexagram */}
+      {[0, 60].map(deg => (
+        <polygon key={deg}
+          points="160,105 200,133 200,187 160,215 120,187 120,133"
+          fill="none" stroke="#8B0000" strokeWidth="1.5"
+          transform={`rotate(${deg} 160 160)`}
+          strokeDasharray={dash(350)} opacity="0.8"
+        />
+      ))}
+
+      {/* Circle rings */}
+      {[45, 90, 130].map((r, i) => (
+        <circle key={i}
+          cx="160" cy="160" r={r}
+          fill="none" stroke={i === 1 ? '#C0392B' : '#D4A017'}
+          strokeWidth={i === 1 ? 1.8 : 1}
+          strokeDasharray={dash(2 * Math.PI * r)}
+          opacity={0.6 + i * 0.1}
+        />
+      ))}
+
+      {/* Center lotus */}
+      {Array.from({ length: 6 }, (_, i) => {
+        const a = (i / 6) * Math.PI * 2
+        const cx = 160 + Math.cos(a) * 30
+        const cy = 160 + Math.sin(a) * 30
+        return (
+          <ellipse key={i}
+            cx={cx} cy={cy} rx="14" ry="7"
+            transform={`rotate(${(i / 6) * 360 + 90}, ${cx}, ${cy})`}
+            fill={progress > 80 ? 'rgba(212,160,23,0.12)' : 'none'}
+            stroke="#D4A017" strokeWidth="1.8"
+            strokeDasharray={dash(64)} opacity="1"
+          />
+        )
+      })}
+
+      {/* Center Om dot */}
+      {progress > 90 && (
+        <text x="160" y="168" textAnchor="middle"
+          fontSize="22" fill="#C0392B" fontFamily="serif"
+          opacity={Math.min((progress - 90) / 10, 1)}>ॐ</text>
+      )}
+
+      {/* Dot grid corners */}
+      {[-1, 1].flatMap(sx => [-1, 1].map(sy => (
+        [0.35, 0.6, 0.85].map((f, j) => (
+          <circle key={`${sx}${sy}${j}`}
+            cx={160 + sx * 145 * f} cy={160 + sy * 145 * f}
+            r="2.5" fill="#D4A017"
+            opacity={progress > 40 ? 0.6 : 0}
+          />
+        ))
+      )))}
+    </svg>
+  )
 }
 
-const PHOTO_SRC = '/sharon.jpeg'
+/* ─── Diyas (oil lamps) component ───────────────────────── */
+function Diya({ lit }: { lit: boolean }) {
+  return (
+    <div className={`diya ${lit ? 'diya--lit' : ''}`}>
+      <div className="diya-flame">
+        <div className="diya-flame-inner" />
+      </div>
+      <svg viewBox="0 0 40 22" xmlns="http://www.w3.org/2000/svg" className="diya-body-svg">
+        <ellipse cx="20" cy="16" rx="18" ry="7" fill="#C0392B" />
+        <ellipse cx="20" cy="14" rx="16" ry="6" fill="#D4A017" />
+        <ellipse cx="20" cy="13" rx="10" ry="4" fill="#FFF3CD" opacity="0.7" />
+        <path d="M 20 13 Q 28 10 32 12" stroke="#8B0000" strokeWidth="1.2" fill="none" />
+      </svg>
+    </div>
+  )
+}
 
+/* ─── Main App ──────────────────────────────────────────── */
 const App = () => {
   const [phase, setPhase] = useState<'splash' | 'main'>('splash')
-  const [glitchActive, setGlitchActive] = useState(false)
-  const [candlesLit, setCandlesLit] = useState(0)
-  const [cakeBurst, setCakeBurst] = useState(false)
-  const [countVal, setCountVal] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [photoLoaded, setPhotoLoaded] = useState(false)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const hasAutoPlayed = useRef(false)
-  const cakeRef = useRef<HTMLButtonElement>(null)
-  const audioSrc = `${import.meta.env.BASE_URL}birthday-song.mp3`
+  const [dyasLit, setDyasLit] = useState(0)
+  const [blessings, setBlessings] = useState<Blessing[]>(SAMPLE_BLESSINGS)
+  const [wishName, setWishName] = useState('')
+  const [wishMsg, setWishMsg] = useState('')
+  const [wishSent, setWishSent] = useState(false)
+  const { petals, burst } = usePetals()
+  const kolamProgress = useKolamDraw(phase === 'main')
+  const blessBtnRef = useRef<HTMLButtonElement>(null)
 
-  const goToMain = useCallback(() => {
+  const goMain = useCallback(() => {
     if (phase !== 'splash') return
     setPhase('main')
-    window.setTimeout(() => setGlitchActive(true), 900)
-    window.setTimeout(() => {
-      let i = 0
-      const t = setInterval(() => { i++; setCandlesLit(i); if (i >= 5) clearInterval(t) }, 300)
-    }, 1400)
-    window.setTimeout(() => {
-      let n = 0; const target = 19
-      const step = () => {
-        n += Math.ceil((target - n) / 5)
-        if (n >= target) { setCountVal(target); return }
-        setCountVal(n); window.setTimeout(step, 60)
-      }
-      step()
-    }, 800)
+    let i = 0
+    const t = setInterval(() => { i++; setDyasLit(i); if (i >= 7) clearInterval(t) }, 280)
   }, [phase])
 
-  const splashLines = useMemo(() => BOOT_LINES, [])
-  const displayed = useTypewriter(splashLines, phase === 'splash', goToMain)
+  const splashText = 'ஸ்வாகதம் — Welcome to the Cradle Ceremony'
+  const typed = useTypewriter(splashText, phase === 'splash', goMain)
 
-  useStarCanvas(canvasRef, true)
-  useScrollReveal(phase === 'main')
+  useScrollReveal()
 
-  const glitchedName = useGlitchText('SHARON', glitchActive)
-  const { particles, burst } = useCakeConfetti()
-
-  useEffect(() => {
-    if (phase === 'main' && audioRef.current && !hasAutoPlayed.current) {
-      hasAutoPlayed.current = true
-      audioRef.current.volume = 0.72
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {})
+  const submitBlessing = () => {
+    if (!wishName.trim() || !wishMsg.trim()) return
+    const nb: Blessing = {
+      id: Date.now(), name: wishName.trim(), msg: wishMsg.trim(), time: 'Just now'
     }
-  }, [phase])
-
-  const handleCakeClick = () => {
-    setCakeBurst(true)
-    window.setTimeout(() => setCakeBurst(false), 120)
-    if (cakeRef.current) {
-      const r = cakeRef.current.getBoundingClientRect()
-      burst(r.left + r.width / 2, r.top + r.height / 3)
+    setBlessings(prev => [nb, ...prev])
+    setWishName(''); setWishMsg(''); setWishSent(true)
+    setTimeout(() => setWishSent(false), 3000)
+    if (blessBtnRef.current) {
+      const r = blessBtnRef.current.getBoundingClientRect()
+      burst(r.left + r.width / 2, r.top)
     }
-  }
-
-  const toggleAudio = async () => {
-    if (!audioRef.current) return
-    if (isPlaying) { audioRef.current.pause(); setIsPlaying(false) }
-    else { try { await audioRef.current.play(); setIsPlaying(true) } catch {} }
   }
 
   return (
     <div className="shell">
-      <canvas ref={canvasRef} className="star-canvas" aria-hidden="true" />
       <div className="scanlines" aria-hidden="true" />
 
-      {/* SPLASH */}
+      {/* ── SPLASH ── */}
       {phase === 'splash' && (
-        <div className="splash" onClick={goToMain} role="button" tabIndex={0}
-          onKeyDown={e => e.key === 'Enter' && goToMain()} aria-label="Skip intro">
-          <div className="hud-corner hud-corner--tl" aria-hidden="true" />
-          <div className="hud-corner hud-corner--tr" aria-hidden="true" />
-          <div className="hud-corner hud-corner--bl" aria-hidden="true" />
-          <div className="hud-corner hud-corner--br" aria-hidden="true" />
-          <div className="terminal">
-            <div className="terminal-header" aria-hidden="true">
-              <span className="t-dot t-dot--r" /><span className="t-dot t-dot--y" /><span className="t-dot t-dot--g" />
-              <span className="t-title">BIRTHDAY_MISSION.exe</span>
-            </div>
-            <div className="terminal-body" role="log" aria-live="polite">
-              {displayed.map((line, i) => (
-                <p key={i} className="t-line">
-                  {line}{i === displayed.length - 1 && <span className="t-cursor" aria-hidden="true">█</span>}
-                </p>
-              ))}
-            </div>
+        <div className="splash" onClick={goMain} role="button" tabIndex={0}
+          onKeyDown={e => e.key === 'Enter' && goMain()} aria-label="Enter ceremony">
+          <div className="splash-gopuram" aria-hidden="true">
+            <GopuramSVG />
           </div>
-          <p className="splash-skip">[ CLICK ANYWHERE TO SKIP ]</p>
+          <div className="splash-content">
+            <div className="splash-om" aria-hidden="true">ॐ</div>
+            <p className="splash-typed" aria-live="polite">
+              {typed}<span className="t-cursor">|</span>
+            </p>
+            <p className="splash-skip">[ தொட்டு உள்ளே வாருங்கள் · Touch to Enter ]</p>
+          </div>
+          <div className="splash-diyas" aria-hidden="true">
+            {Array.from({ length: 7 }, (_, i) => (
+              <Diya key={i} lit={i < dyasLit} />
+            ))}
+          </div>
         </div>
       )}
 
-      {/* MAIN */}
-      <main className={`main ${phase === 'main' ? 'main--visible' : ''}`} aria-hidden={phase !== 'main'}>
-        <div className="hud-corner hud-corner--tl" aria-hidden="true" />
-        <div className="hud-corner hud-corner--tr" aria-hidden="true" />
-        <div className="hud-corner hud-corner--bl" aria-hidden="true" />
-        <div className="hud-corner hud-corner--br" aria-hidden="true" />
+      {/* ── MAIN ── */}
+      <main className={`main ${phase === 'main' ? 'main--visible' : ''}`}
+        aria-hidden={phase !== 'main'}>
 
-        <div className="status-bar" aria-hidden="true">
-          <span className="status-item"><span className="status-dot" />ONLINE</span>
-          <span className="status-item">03 · 06 · 2006 → 03 · 06 · 2026</span>
-          <span className="status-item">SQUAD: BESTO FRIENDO</span>
+        {/* Gopuram header */}
+        <div className="gopuram-header" aria-hidden="true">
+          <GopuramSVG slim />
+          <div className="gopuram-lamps">
+            {Array.from({ length: 7 }, (_, i) => <Diya key={i} lit={true} />)}
+          </div>
         </div>
 
-        {/* HERO */}
-        <section className="hero reveal" aria-label="Birthday greeting">
-          <div className="hero-eyebrow">
-            <span className="eyebrow-line" aria-hidden="true" />
-            <span className="eyebrow-text">19 YEARS OF LEGEND</span>
-            <span className="eyebrow-line" aria-hidden="true" />
+        {/* ── HERO ── */}
+        <section className="hero reveal" aria-label="Ceremony welcome">
+          <div className="hero-kolam" aria-hidden="true">
+            <KolamPattern progress={kolamProgress} />
           </div>
 
-          <div className="hero-age-wrap" aria-label="Age 19">
-            <span className="hero-age-num" aria-hidden="true">{countVal}</span>
-            <div className="hero-age-ring" aria-hidden="true" />
-          </div>
-
-          <h1 className="hero-title">
-            <span className="title-line1">HAPPY BIRTHDAY</span>
-            <span className="title-name">{glitchedName}</span>
-          </h1>
-
-          <p className="hero-sub">
-            Born 03 · 06 · 2006 · Nineteen years of stories, fire, and unforgettable moments.
-          </p>
-
-          <div className="hero-divider" aria-hidden="true">
-            <span /><span className="divider-diamond">◆</span><span />
+          <div className="hero-inner">
+            <p className="hero-eyebrow">
+              <span className="line-ornament">✦</span>
+              திருவிழா · Sacred Ceremony
+              <span className="line-ornament">✦</span>
+            </p>
+            <h1 className="hero-title">
+              <span className="title-top">Cradle Ceremony</span>
+              <span className="title-tamil">தொட்டில் விழா</span>
+            </h1>
+            <div className="hero-lotus" aria-hidden="true">
+              <LotusRow />
+            </div>
+            <p className="hero-sub">
+              A blessed child has arrived, filling our home with divine grace.<br />
+              We joyfully invite you to witness this sacred beginning.
+            </p>
+            <div className="hero-parents">
+              <span className="parents-label">Hosted with love by</span>
+              <span className="parents-name">Dineshkumar &amp; Sutharsana</span>
+            </div>
           </div>
         </section>
 
-        {/* PHOTO */}
-        <section className="photo-section reveal" aria-label="Sharon's photo">
-          <div className="photo-frame-wrap">
-            <div className="photo-frame-glow" aria-hidden="true" />
-            <div className={`photo-frame ${photoLoaded ? 'photo-frame--loaded' : ''}`}>
-              <img
-                src={PHOTO_SRC}
-                alt="Sharon"
-                className="photo-img"
-                onLoad={() => setPhotoLoaded(true)}
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+        {/* ── BABY DETAILS ── */}
+        <section className="baby-section reveal" aria-label="Baby details">
+          <div className="section-header">
+            <div className="section-line" aria-hidden="true" />
+            <h2 className="section-title">
+              <span className="s-title-om" aria-hidden="true">ॐ</span>
+              The Blessed One
+            </h2>
+            <div className="section-line" aria-hidden="true" />
+          </div>
+
+          <div className="baby-cards">
+            {[
+              { icon: '🌸', label: 'Name', value: '[Baby\'s Name]', sub: 'To be revealed at ceremony' },
+              { icon: '📅', label: 'Born on', value: 'Aadi Month', sub: 'Auspicious Tamil month' },
+              { icon: '⭐', label: 'Nakshathram', value: 'Rohini', sub: 'Star of birth' },
+              { icon: '🕉️', label: 'Rashi', value: 'Rishabha', sub: 'Taurus · Vrishabha' },
+            ].map(c => (
+              <div key={c.label} className="baby-card">
+                <span className="baby-card-icon" aria-hidden="true">{c.icon}</span>
+                <span className="baby-card-label">{c.label}</span>
+                <span className="baby-card-value">{c.value}</span>
+                <span className="baby-card-sub">{c.sub}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="photo-placeholder-wrap reveal">
+            <div className="photo-placeholder">
+              <div className="photo-corners">
+                {['tl','tr','bl','br'].map(c => (
+                  <div key={c} className={`pc pc--${c}`} />
+                ))}
+              </div>
+              <span className="photo-icon" aria-hidden="true">🌷</span>
+              <span className="photo-label">Baby's Photo</span>
+              <span className="photo-hint">Add your image here</span>
+            </div>
+          </div>
+        </section>
+
+        {/* ── CEREMONY DETAILS ── */}
+        <section className="ceremony-section reveal" aria-label="Ceremony details">
+          <div className="ceremony-bg-pattern" aria-hidden="true" />
+
+          <div className="section-header">
+            <div className="section-line" aria-hidden="true" />
+            <h2 className="section-title">
+              <span className="s-title-om" aria-hidden="true">ॐ</span>
+              Ceremony Details
+            </h2>
+            <div className="section-line" aria-hidden="true" />
+          </div>
+
+          <div className="ceremony-cards">
+            {[
+              {
+                icon: '🗓️',
+                tamil: 'நாள்',
+                heading: 'Auspicious Date',
+                line1: '[Ceremony Date]',
+                line2: '[Tamil Calendar Date]',
+              },
+              {
+                icon: '🕰️',
+                tamil: 'நேரம்',
+                heading: 'Muhurtham Time',
+                line1: '[Time] onwards',
+                line2: 'Shubha Muhurtham',
+              },
+              {
+                icon: '📍',
+                tamil: 'இடம்',
+                heading: 'Venue',
+                line1: '[Venue Name]',
+                line2: '[Address, City]',
+              },
+            ].map(c => (
+              <div key={c.heading} className="ceremony-card">
+                <div className="ceremony-card-top">
+                  <span className="ceremony-icon" aria-hidden="true">{c.icon}</span>
+                  <span className="ceremony-tamil">{c.tamil}</span>
+                </div>
+                <h3 className="ceremony-card-heading">{c.heading}</h3>
+                <p className="ceremony-card-line1">{c.line1}</p>
+                <p className="ceremony-card-line2">{c.line2}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="ceremony-note reveal">
+            <span className="note-icon" aria-hidden="true">🌺</span>
+            <p>Dress code: <strong>Traditional attire welcomed and encouraged</strong></p>
+            <span className="note-icon" aria-hidden="true">🌺</span>
+          </div>
+        </section>
+
+        {/* ── BLESSINGS ── */}
+        <section className="blessings-section reveal" aria-label="Blessings and wishes">
+          <div className="section-header">
+            <div className="section-line" aria-hidden="true" />
+            <h2 className="section-title">
+              <span className="s-title-om" aria-hidden="true">ॐ</span>
+              Blessings &amp; Wishes
+            </h2>
+            <div className="section-line" aria-hidden="true" />
+          </div>
+
+          {/* Input form */}
+          <div className="blessing-form reveal">
+            <p className="form-heading">🙏 Leave your blessings for the child</p>
+            <div className="form-row">
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Your name"
+                value={wishName}
+                onChange={e => setWishName(e.target.value)}
+                maxLength={40}
+                aria-label="Your name"
               />
-              {!photoLoaded && (
-                <div className="photo-placeholder" aria-hidden="true">
-                  <span className="placeholder-icon">◈</span>
-                  <span className="placeholder-text">LOADING PHOTO…</span>
-                </div>
-              )}
-              <div className="photo-overlay" aria-hidden="true" />
-              <div className="photo-corner photo-corner--tl" aria-hidden="true" />
-              <div className="photo-corner photo-corner--tr" aria-hidden="true" />
-              <div className="photo-corner photo-corner--bl" aria-hidden="true" />
-              <div className="photo-corner photo-corner--br" aria-hidden="true" />
             </div>
-            <div className="photo-caption">
-              <span className="caption-name">SHARON</span>
-              <span className="caption-sep">·</span>
-              <span className="caption-date">03 · 06 · 2006</span>
+            <div className="form-row">
+              <textarea
+                className="form-input form-textarea"
+                placeholder="Write your blessing or wishes here… (Tamil / English)"
+                value={wishMsg}
+                onChange={e => setWishMsg(e.target.value)}
+                maxLength={200}
+                rows={3}
+                aria-label="Your blessing"
+              />
             </div>
+            <button
+              ref={blessBtnRef}
+              type="button"
+              className="bless-btn"
+              onClick={submitBlessing}
+              aria-label="Send blessing"
+            >
+              {wishSent ? '✓ Blessing Sent! 🌸' : 'Send Blessing 🙏'}
+            </button>
           </div>
-        </section>
 
-        {/* CAKE */}
-        <section className="cake-section reveal" aria-label="Birthday cake">
-          <button ref={cakeRef} type="button"
-            className={`cake-btn ${cakeBurst ? 'cake-btn--burst' : ''}`}
-            onClick={handleCakeClick} aria-label="Click the cake to celebrate">
-            <div className="cake-candles" aria-hidden="true">
-              {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className={`candle ${i < candlesLit ? 'candle--lit' : ''}`}
-                  style={{ '--cd': `${i * 0.28}s` } as CSSProperties}>
-                  <div className="candle-flame"><div className="flame-core" /></div>
-                  <div className="candle-body" />
+          {/* Blessings wall */}
+          <div className="blessings-wall">
+            {blessings.map(b => (
+              <div key={b.id} className="blessing-card reveal">
+                <div className="blessing-header">
+                  <div className="blessing-avatar" aria-hidden="true">
+                    {b.name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="blessing-meta">
+                    <span className="blessing-name">{b.name}</span>
+                    <span className="blessing-time">{b.time}</span>
+                  </div>
+                  <span className="blessing-deco" aria-hidden="true">🪔</span>
                 </div>
-              ))}
-            </div>
-            <div className="cake-tier cake-tier--top"><span className="tier-deco">✦ ✦ ✦</span></div>
-            <div className="cake-tier cake-tier--mid">
-              <span className="tier-stripe" /><span className="tier-stripe" /><span className="tier-stripe" />
-            </div>
-            <div className="cake-tier cake-tier--base"><span className="tier-deco tier-deco--base">◈ JUNE 03 · 19 ◈</span></div>
-            <p className="cake-hint" aria-hidden="true">[ TAP TO CELEBRATE ]</p>
-          </button>
-
-          <div className="confetti-layer" aria-hidden="true">
-            {particles.map(p => (
-              <div key={p.id} className="confetti-p" style={{
-                left: p.x, top: p.y,
-                width: p.size, height: p.shape === 'circle' ? p.size : p.size * 0.5,
-                background: p.color,
-                borderRadius: p.shape === 'circle' ? '50%' : '1px',
-                transform: `rotate(${p.rot}deg)`,
-                opacity: p.life,
-              }} />
+                <p className="blessing-msg">{b.msg}</p>
+              </div>
             ))}
           </div>
         </section>
 
-        {/* STATS */}
-        <section className="stats-section reveal" aria-label="Birthday stats">
-          {[
-            { icon: '◎', val: '19', sub: 'Years of greatness' },
-            { icon: '⬡', val: '2006', sub: 'Birth year · Legend' },
-            { icon: '◈', val: '#1', sub: 'Rank in my world' },
-            { icon: '◆', val: '∞', sub: 'Memories ahead' },
-          ].map(s => (
-            <div key={s.sub} className="stat-card">
-              <span className="stat-icon" aria-hidden="true">{s.icon}</span>
-              <span className="stat-val">{s.val}</span>
-              <span className="stat-sub">{s.sub}</span>
-            </div>
-          ))}
-        </section>
-
-        {/* MESSAGE */}
-        <section className="message-section reveal" aria-label="Birthday message">
-          <div className="message-card">
-            <div className="msg-accent" aria-hidden="true" />
-            <h2 className="msg-title">A MESSAGE FOR YOU</h2>
-<p className="msg-body">
-  Nineteen years ago the world got a little more interesting —
-  specifically, the trash can outside. We found you, cleaned you up,
-  and decided to keep you. Best decision ever, honestly.
-</p>
-<p className="msg-body">
-  But in all seriousness — you've been lighting up every room, every
-  moment, every memory since day one. Today is yours, Sharon. Every
-  single second of it. Here's to <em>nineteen</em> — and to every
-  incredible year still to come. 🗑️→👑
-</p>
-            <div className="msg-signature">
-              <span className="sig-line" aria-hidden="true" />
-              <span className="sig-text">From your Besto Friendo, Dishon ✦</span>
-              <span className="sig-line" aria-hidden="true" />
-            </div>
-          </div>
-        </section>
-
+        {/* ── FOOTER ── */}
         <footer className="footer">
-          <span className="footer-text">03 · 06 · 2006 — 03 · 06 · 2025 · 19 YEARS · SHARON</span>
+          <div className="footer-kolam" aria-hidden="true">
+            <SmallKolam />
+          </div>
+          <p className="footer-text">
+            <span className="footer-om" aria-hidden="true">ॐ</span>
+            With love &amp; blessings — Dineshkumar &amp; Sutharsana
+          </p>
+          <p className="footer-sub">
+            தொட்டில் விழா · Cradle Ceremony
+          </p>
+          <div className="footer-diyas" aria-hidden="true">
+            {Array.from({ length: 5 }, (_, i) => <Diya key={i} lit={true} />)}
+          </div>
         </footer>
 
-        <audio ref={audioRef} src={audioSrc} loop playsInline />
-
-        <button type="button"
-          className={`music-btn ${isPlaying ? 'music-btn--on' : ''}`}
-          onClick={toggleAudio}
-          aria-label={isPlaying ? 'Pause music' : 'Play music'}>
-          <span className="music-icon" aria-hidden="true">{isPlaying ? '⏸' : '▶'}</span>
-          <span>{isPlaying ? 'PAUSE' : 'PLAY'}</span>
-        </button>
+        {/* Confetti layer */}
+        <div className="confetti-layer" aria-hidden="true">
+          {petals.map(p => (
+            <div key={p.id} className="petal" style={{
+              left: p.x, top: p.y,
+              width: p.size, height: p.size * 0.55,
+              background: p.color,
+              borderRadius: '50% 0 50% 0',
+              transform: `rotate(${p.rot}deg)`,
+              opacity: p.life,
+            } as CSSProperties} />
+          ))}
+        </div>
       </main>
     </div>
+  )
+}
+
+/* ─── Gopuram SVG ───────────────────────────────────────── */
+function GopuramSVG({ slim = false }: { slim?: boolean }) {
+  const h = slim ? 90 : 200
+  const w = slim ? 420 : 360
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} xmlns="http://www.w3.org/2000/svg"
+      style={{ width: '100%', maxHeight: h }} aria-hidden="true">
+      <defs>
+        <linearGradient id="gpGold" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#D4A017" />
+          <stop offset="100%" stopColor="#8B0000" />
+        </linearGradient>
+      </defs>
+      {slim ? (
+        /* slim top bar */
+        <>
+          <rect x="0" y="70" width={w} height="20" fill="#8B0000" opacity="0.9" />
+          <rect x="0" y="68" width={w} height="3" fill="#D4A017" />
+          {Array.from({ length: 21 }, (_, i) => (
+            <g key={i}>
+              <rect x={i * 20 + 4} y="38" width="12" height="32" rx="4" fill="url(#gpGold)" />
+              <ellipse cx={i * 20 + 10} cy="36" rx="6" ry="8" fill="#D4A017" />
+              <circle cx={i * 20 + 10} cy="28" r="3.5" fill="#C0392B" />
+            </g>
+          ))}
+          <rect x="0" y="85" width={w} height="5" fill="#D4A017" opacity="0.5" />
+        </>
+      ) : (
+        /* full splash gopuram */
+        <>
+          {/* Main tower */}
+          <rect x="130" y="40" width="100" height="160" rx="4" fill="#8B0000" opacity="0.95" />
+          {/* Tiers */}
+          {[0, 1, 2, 3].map(t => (
+            <rect key={t}
+              x={110 + t * 10} y={40 + t * 26}
+              width={140 - t * 20} height={26}
+              rx="3" fill={t % 2 === 0 ? '#D4A017' : '#C0392B'} opacity={0.92 - t * 0.05} />
+          ))}
+          {/* Kalasham (finial) */}
+          <ellipse cx="180" cy="35" rx="14" ry="18" fill="#D4A017" />
+          <circle cx="180" cy="17" r="7" fill="#C0392B" />
+          <circle cx="180" cy="10" r="4" fill="#D4A017" />
+          {/* Decorative pillars */}
+          {[-50, 50].map(dx => (
+            <g key={dx}>
+              <rect x={180 + dx - 8} y="100" width="16" height="100" rx="4" fill="#C0392B" opacity="0.8" />
+              <ellipse cx={180 + dx} cy="98" rx="8" ry="12" fill="#D4A017" opacity="0.9" />
+            </g>
+          ))}
+          {/* Base */}
+          <rect x="80" y="195" width="200" height="10" rx="2" fill="#D4A017" opacity="0.7" />
+          {/* Small kalashams on side pillars */}
+          {[-50, 50].map(dx => (
+            <circle key={dx} cx={180 + dx} cy="85" r="5" fill="#D4A017" opacity="0.9" />
+          ))}
+          {/* Dots row */}
+          {Array.from({ length: 9 }, (_, i) => (
+            <circle key={i} cx={100 + i * 20} cy="192" r="3" fill="#D4A017" opacity="0.6" />
+          ))}
+          {/* Om center */}
+          <text x="180" y="130" textAnchor="middle" fontSize="28"
+            fill="#FFF8E7" fontFamily="serif" opacity="0.92">ॐ</text>
+        </>
+      )}
+    </svg>
+  )
+}
+
+/* ─── Lotus row ─────────────────────────────────────────── */
+function LotusRow() {
+  return (
+    <div className="lotus-row" aria-hidden="true">
+      {Array.from({ length: 5 }, (_, i) => (
+        <svg key={i} viewBox="0 0 40 36" xmlns="http://www.w3.org/2000/svg"
+          className="lotus-icon" style={{ opacity: i === 2 ? 1 : 0.55 + Math.abs(2 - i) * -0.1 }}>
+          <ellipse cx="20" cy="24" rx="10" ry="5" fill="#D4A017" opacity="0.3" />
+          {[0, -10, 10, -20, 20].map((dx, j) => (
+            <ellipse key={j}
+              cx={20 + dx} cy={22 - Math.abs(dx) * 0.2}
+              rx={j === 0 ? 7 : 5.5} ry={j === 0 ? 14 : 11}
+              fill={j === 0 ? '#C0392B' : '#D4A017'}
+              opacity={j === 0 ? 0.9 : 0.75}
+              transform={`rotate(${dx * 1.5} ${20 + dx} 22)`}
+            />
+          ))}
+          <ellipse cx="20" cy="24" rx="5" ry="3" fill="#FFF3CD" opacity="0.9" />
+        </svg>
+      ))}
+    </div>
+  )
+}
+
+/* ─── Small footer kolam ────────────────────────────────── */
+function SmallKolam() {
+  return (
+    <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"
+      style={{ width: 80, height: 80, opacity: 0.5 }} aria-hidden="true">
+      {[20, 40, 55].map((r, i) => (
+        <circle key={i} cx="60" cy="60" r={r}
+          fill="none" stroke={i === 1 ? '#C0392B' : '#D4A017'} strokeWidth="1" />
+      ))}
+      {Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * Math.PI * 2
+        return <circle key={i} cx={60 + Math.cos(a) * 40} cy={60 + Math.sin(a) * 40} r="3" fill="#D4A017" opacity="0.8" />
+      })}
+      <text x="60" y="65" textAnchor="middle" fontSize="14" fill="#C0392B" fontFamily="serif">ॐ</text>
+    </svg>
   )
 }
 
